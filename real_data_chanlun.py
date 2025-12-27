@@ -4,6 +4,7 @@
 
 import pandas as pd
 import numpy as np
+import os
 from datetime import datetime, timedelta
 from chanlun_processor import ChanlunProcessor
 from data_fetcher import AStockDataFetcher
@@ -15,7 +16,6 @@ try:
     VISUALIZATION_TYPE = "matplotlib"
 except ImportError:
     try:
-
         from plotly_visualizer import plotly_chanlun_visualization
         VISUALIZATION_AVAILABLE = True
         VISUALIZATION_TYPE = "plotly"
@@ -121,16 +121,72 @@ def get_user_input():
     return stock_code, start_date, end_date, data_type, frequency
 
 
-def show_chart(result, stock_code, data_type):
-    """显示图表"""
+def create_and_save_chart(result, stock_code, start_date, end_date, data_type):
+    """创建图表并保存HTML，返回图形对象用于后续显示"""
     if not VISUALIZATION_AVAILABLE:
-        print("⚠️  可视化模块不可用")
+        print("⚠️  可视化模块不可用，无法保存HTML文件")
+        return None, False
+    
+    try:
+        # 确保results目录存在
+        results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # 生成文件名
+        filename = f"{stock_code}_{start_date}_{end_date}_{data_type}.html"
+        filepath = os.path.join(results_dir, filename)
+        
+        chart_obj = None
+        
+        if VISUALIZATION_TYPE == "plotly":
+            # 使用Plotly版本创建图表并保存HTML
+            chart_obj = plotly_chanlun_visualization(result, start_idx=0, bars_to_show=len(result), 
+                                                     data_type=data_type, return_fig=True)
+            if chart_obj is not None:
+                chart_obj.write_html(filepath, include_plotlyjs='cdn')
+                print(f"✅ HTML文件已保存: {filepath}")
+                return chart_obj, True
+        else:
+            # 使用matplotlib版本创建图表并保存HTML
+            from enhanced_visualizer import EnhancedChanlunVisualizer
+            chart_obj = EnhancedChanlunVisualizer()
+            chart_obj.plot_chanlun_with_interaction(result, start_idx=0, bars_to_show=len(result), 
+                                                    data_type=data_type, show_plot=False)
+            
+            try:
+                # 将matplotlib图形保存为HTML
+                import mpld3
+                html_str = mpld3.fig_to_html(chart_obj.fig)
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(html_str)
+                print(f"✅ HTML文件已保存: {filepath}")
+                return chart_obj, True
+            except ImportError:
+                print("⚠️  需要安装 mpld3 库来保存matplotlib图为HTML文件")
+                print("   安装命令: pip install mpld3")
+                return None, False
+            except Exception as e:
+                print(f"❌ 保存matplotlib HTML文件失败: {e}")
+                return None, False
+                
+        print(f"❌ HTML文件保存失败")
+        return None, False
+        
+    except Exception as e:
+        print(f"❌ HTML文件保存出错: {e}")
+        return None, False
+
+
+def show_chart(chart_obj, data_type):
+    """显示图表（使用已创建的图表对象）"""
+    if not VISUALIZATION_AVAILABLE or chart_obj is None:
+        print("⚠️  可视化模块不可用或图表对象为空")
         return
     
     try:
         if VISUALIZATION_TYPE == "plotly":
             # 使用Plotly版本（支持丰富交互功能）
-            plotly_chanlun_visualization(result, start_idx=0, bars_to_show=len(result), data_type=data_type)
+            chart_obj.show()
             print("✅ Plotly交互图表显示成功")
             print("💡 功能说明：")
             print("   - 拖拽缩放：鼠标拖拽可以缩放图表")
@@ -139,7 +195,8 @@ def show_chart(result, stock_code, data_type):
             print("   - 成交量显示：底部显示成交量柱状图")
         else:
             # 使用matplotlib版本
-            enhanced_chanlun_visualization(result, start_idx=0, bars_to_show=len(result), data_type=data_type)
+            import matplotlib.pyplot as plt
+            plt.show()
             print("✅ K线图表显示成功")
     except Exception as e:
         print(f"❌ 图表显示失败: {e}")
@@ -174,7 +231,13 @@ def main():
             if result is not None:
                 # 显示图表选项
                 data_type_with_freq = data_type if data_type == 'daily' else f"minute_{frequency}"
-                show_chart(result, stock_code, data_type_with_freq)
+                
+                # 创建图表并保存HTML，返回图表对象
+                chart_obj, save_success = create_and_save_chart(result, stock_code, start_date, end_date, data_type_with_freq)
+                
+                if save_success:
+                    # 显示图表（使用已创建的图表对象）
+                    show_chart(chart_obj, data_type_with_freq)
                 
                 # 显示详细统计
                 if 'fractal_type' in result.columns:

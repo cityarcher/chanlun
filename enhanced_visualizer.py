@@ -26,7 +26,7 @@ class EnhancedChanlunVisualizer:
         self.cursor = None
         self.annotation = None
         
-    def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily'):
+    def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily', show_plot=True):
         """
         绘制带交互功能的缠论K线图
         
@@ -35,6 +35,7 @@ class EnhancedChanlunVisualizer:
             start_idx: 起始索引
             bars_to_show: 显示的K线数量
             data_type: K线类型 ('daily' 或 'minute')
+            show_plot: 是否显示图形
         """
         # 数据验证
         required_columns = ['datetime', 'open', 'high', 'low', 'close']
@@ -91,7 +92,8 @@ class EnhancedChanlunVisualizer:
         
         # 显示图表
         plt.tight_layout()
-        plt.show()
+        if show_plot:
+            plt.show()
     
     def plot_candlesticks(self):
         """绘制K线"""
@@ -293,7 +295,7 @@ class EnhancedChanlunVisualizer:
         # 重绘
         self.fig.canvas.draw_idle()
 
-def enhanced_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type='daily'):
+def enhanced_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type='daily', save_html=None):
     """
     增强版缠论K线可视化函数（兼容原版本）
     
@@ -302,9 +304,33 @@ def enhanced_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_typ
         start_idx: 起始索引
         bars_to_show: 显示的K线数量
         data_type: K线类型 ('daily' 或 'minute')
+        save_html: HTML文件路径，如果提供则保存为HTML文件
+    
+    Returns:
+        bool: 如果保存HTML成功则返回True，否则返回False
     """
     visualizer = EnhancedChanlunVisualizer()
-    visualizer.plot_chanlun_with_interaction(data, start_idx, bars_to_show, data_type)
+    # 如果只是保存HTML，不显示图形
+    show_plot = save_html is None
+    visualizer.plot_chanlun_with_interaction(data, start_idx, bars_to_show, data_type, show_plot=show_plot)
+    
+    if save_html:
+        try:
+            # 将matplotlib图形保存为HTML
+            import mpld3
+            html_str = mpld3.fig_to_html(visualizer.fig)
+            with open(save_html, 'w', encoding='utf-8') as f:
+                f.write(html_str)
+            return True
+        except ImportError:
+            print("⚠️  需要安装 mpld3 库来保存matplotlib图为HTML文件")
+            print("   安装命令: pip install mpld3")
+            return False
+        except Exception as e:
+            print(f"❌ 保存HTML文件失败: {e}")
+            return False
+    
+    return True
 
 if __name__ == "__main__":
     print("🎯 缠论K线可视化工具（增强版）")

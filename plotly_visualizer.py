@@ -20,7 +20,7 @@ class PlotlyChanlunVisualizer:
         self.data = None
         self.fig = None
         
-    def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily'):
+    def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily', show_plot=True):
         """
         绘制带丰富交互功能的缠论K线图
         
@@ -29,6 +29,7 @@ class PlotlyChanlunVisualizer:
             start_idx: 起始索引
             bars_to_show: 显示的K线数量
             data_type: K线类型 ('daily' 或 'minute')
+            show_plot: 是否显示图形
         """
         # 数据验证
         required_columns = ['datetime', 'open', 'high', 'low', 'close']
@@ -319,7 +320,7 @@ class PlotlyChanlunVisualizer:
             print("没有可显示的图表")
 
 
-def plotly_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type='daily'):
+def plotly_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type='daily', return_fig=False):
     """
     基于Plotly的缠论K线可视化函数
     
@@ -328,14 +329,21 @@ def plotly_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type=
         start_idx: 起始索引
         bars_to_show: 显示的K线数量
         data_type: K线类型 ('daily' 或 'minute')
+        return_fig: 是否返回Figure对象而不显示
     
     Returns:
-        Plotly Figure对象
+        Plotly Figure对象 (当return_fig=True时)
     """
     visualizer = PlotlyChanlunVisualizer()
-    fig = visualizer.plot_chanlun_with_interaction(data, start_idx, bars_to_show, data_type)
-    visualizer.show()
-    return fig
+    # 如果只是返回图形对象，不显示图形
+    show_plot = not return_fig
+    fig = visualizer.plot_chanlun_with_interaction(data, start_idx, bars_to_show, data_type, show_plot=show_plot)
+    
+    if return_fig:
+        return fig
+    else:
+        visualizer.show()
+        return fig
 
 
 if __name__ == "__main__":
