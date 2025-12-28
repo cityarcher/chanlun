@@ -195,6 +195,17 @@ class ChanlunProcessor:
             print(f"缺少必需的列: {missing_cols}")
             return df.copy()
         
+        # 检查volume和amount列，如果不存在则创建默认值
+        if 'volume' not in df.columns:
+            df = df.copy()
+            df['volume'] = 0
+            print("警告：缺少volume列，使用默认值0")
+        
+        if 'amount' not in df.columns:
+            df = df.copy()
+            df['amount'] = 0
+            print("警告：缺少amount列，使用默认值0")
+        
         print(f"开始基于包含关系合并K线...")
         
         chanlun_klines = []
@@ -225,13 +236,19 @@ class ChanlunProcessor:
                         merged_high = min(including['high'], included['high'])
                         merged_low = min(including['low'], included['low'])
                     
+                    # 计算合并后的成交量和成交额（累加所有参与合并的K线）
+                    merged_volume = sum(kline['volume'] for kline in chanlun_group + [next_kline] if pd.notna(kline.get('volume', 0)))
+                    merged_amount = sum(kline['amount'] for kline in chanlun_group + [next_kline] if pd.notna(kline.get('amount', 0)))
+                    
                     # 创建合并后的K线
                     merged_kline = pd.Series({
                         'datetime': last_in_group['datetime'],
                         'open': chanlun_group[0]['open'],
                         'high': merged_high,
                         'low': merged_low,
-                        'close': next_kline['close']
+                        'close': next_kline['close'],
+                        'volume': merged_volume,
+                        'amount': merged_amount
                     })
                     
                     # 用合并后的K线替换最后一根K线
@@ -248,12 +265,18 @@ class ChanlunProcessor:
                 # 确定这根缠论K线的方向
                 direction = self.determine_direction(chanlun_klines)
                 
+                # 计算整个合并组的成交量和成交额之和
+                total_volume = sum(kline.get('volume', 0) for kline in chanlun_group if pd.notna(kline.get('volume', 0)))
+                total_amount = sum(kline.get('amount', 0) for kline in chanlun_group if pd.notna(kline.get('amount', 0)))
+                
                 chanlun_kline = {
                     'datetime': chanlun_group[0]['datetime'],
                     'open': chanlun_group[0]['open'],
                     'high': final_kline['high'],
                     'low': final_kline['low'],
                     'close': final_kline['close'],
+                    'volume': total_volume,
+                    'amount': total_amount,
                     'direction': direction
                 }
                 

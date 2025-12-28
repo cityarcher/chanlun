@@ -19,6 +19,25 @@ class PlotlyChanlunVisualizer:
     def __init__(self):
         self.data = None
         self.fig = None
+    
+    def _is_trading_time(self, dt):
+        """判断是否为交易时间"""
+        if pd.isna(dt):
+            return False
+        
+        # 提取时间部分
+        time = dt.time()
+        
+        # A股交易时间：
+        # 上午：9:30-11:30
+        # 下午：13:00-15:00
+        morning_start = pd.Timestamp('09:30:00').time()
+        morning_end = pd.Timestamp('11:30:00').time()
+        afternoon_start = pd.Timestamp('13:00:00').time()
+        afternoon_end = pd.Timestamp('15:00:00').time()
+        
+        return ((morning_start <= time <= morning_end) or 
+                (afternoon_start <= time <= afternoon_end))
         
     def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily', show_plot=True):
         """
@@ -52,6 +71,8 @@ class PlotlyChanlunVisualizer:
         # 保存数据引用
         self.data = plot_data
         
+
+        
         # 计算Y轴范围
         yaxis_min = plot_data['low'].min() * 0.98  # 留2%边距
         yaxis_max = plot_data['high'].max() * 1.02  # 留2%边距
@@ -65,17 +86,41 @@ class PlotlyChanlunVisualizer:
                 gridwidth=1,
                 gridcolor='lightgray'
             )
-            height = 950
+            height = 900
         elif data_type.startswith('minute_'):
             freq = data_type.split('_')[1]
+            
+            # 调试：显示分钟数据的时间范围
+            print(f"📊 {freq}分钟K线时间范围:")
+            print(f"  - 开始时间: {plot_data['datetime'].min()}")
+            print(f"  - 结束时间: {plot_data['datetime'].max()}")
+            print(f"  - 数据点数: {len(plot_data)}")
+            
+            # 设置时间标签
+            n_points = len(plot_data)
+            if n_points <= 10:
+                # 少量数据，显示所有时间点
+                tick_positions = list(range(n_points))
+                tick_labels = [dt.strftime('%H:%M') for dt in plot_data['datetime']]
+            else:
+                # 大量数据，选择关键时间点
+                step = max(1, n_points // 8)  # 最多8个刻度
+                tick_positions = list(range(0, n_points, step))
+                tick_labels = [plot_data['datetime'].iloc[i].strftime('%H:%M') for i in tick_positions]
+            
+            # 分钟K线：使用数值轴，自定义时间标签
             xaxis_config = dict(
-                title=f'时间 ({freq}分钟)',
-                type='date',
+                title=f'K线序号 ({freq}分钟)',
+                type='linear',  # 使用线性轴而不是日期轴
                 showgrid=True,
                 gridwidth=1,
-                gridcolor='lightgray'
+                gridcolor='lightgray',
+                # 自定义刻度标签显示实际时间
+                tickmode='array',
+                tickvals=tick_positions,
+                ticktext=tick_labels
             )
-            height = 950
+            height = 900
         else:
             xaxis_config = dict(
                 title='时间',
@@ -84,7 +129,7 @@ class PlotlyChanlunVisualizer:
                 gridwidth=1,
                 gridcolor='lightgray'
             )
-            height = 950
+            height = 900
         
         # 创建子图 - 主体图占更大比例
         self.fig = make_subplots(
@@ -92,29 +137,51 @@ class PlotlyChanlunVisualizer:
             shared_xaxes=True,
             vertical_spacing=0.02,  # 减小间距
             subplot_titles=('K线图', '成交量'),
-            row_heights=[0.95, 0.05]  # K线图占85%，成交量图占15%
+            row_heights=[0.9, 0.1]  # K线图占85%，成交量图占15%
         )
         
-        # 添加K线图
-        candlestick = go.Candlestick(
-            x=plot_data['datetime'],
-            open=plot_data['open'],
-            high=plot_data['high'],
-            low=plot_data['low'],
-            close=plot_data['close'],
-            name='K线',
-            increasing_line_color='red',      # 上涨K线为红色
-            decreasing_line_color='green'      # 下跌K线为绿色
-        )
+        # 为分钟K线使用数值索引作为横坐标
+        if data_type.startswith('minute_'):
+            # 使用数值索引，但保留时间信息用于hover
+            x_values = list(range(len(plot_data)))
+            hover_text = [f"时间: {dt}<br>开: {o}<br>高: {h}<br>低: {l}<br>收: {c}" 
+                        for dt, o, h, l, c in zip(plot_data['datetime'], plot_data['open'], 
+                                                  plot_data['high'], plot_data['low'], plot_data['close'])]
+            
+            candlestick = go.Candlestick(
+                x=x_values,
+                open=plot_data['open'],
+                high=plot_data['high'],
+                low=plot_data['low'],
+                close=plot_data['close'],
+                name='K线',
+                increasing_line_color='red',      # 上涨K线为红色
+                decreasing_line_color='green',      # 下跌K线为绿色
+                hovertext=hover_text,
+                hoverinfo='text'
+            )
+        else:
+            # 日线使用datetime
+            candlestick = go.Candlestick(
+                x=plot_data['datetime'],
+                open=plot_data['open'],
+                high=plot_data['high'],
+                low=plot_data['low'],
+                close=plot_data['close'],
+                name='K线',
+                increasing_line_color='red',      # 上涨K线为红色
+                decreasing_line_color='green'      # 下跌K线为绿色
+            )
+        
         self.fig.add_trace(candlestick, row=1, col=1)
         
         # 标记分型
         if 'is_fractal' in plot_data.columns and 'fractal_type' in plot_data.columns:
-            self._add_fractals(plot_data)
+            self._add_fractals(plot_data, data_type)
         
         # 绘制笔
         if 'is_segment' in plot_data.columns:
-            self._draw_segments(plot_data)
+            self._draw_segments(plot_data, data_type)
         
         # 添加成交量
         if 'volume' in plot_data.columns:
@@ -122,13 +189,31 @@ class PlotlyChanlunVisualizer:
             colors = ['red' if close >= open else 'green' 
                      for close, open in zip(plot_data['close'], plot_data['open'])]
             
-            volume = go.Bar(
-                x=plot_data['datetime'],
-                y=plot_data['volume'],
-                name='成交量',
-                marker_color=colors,
-                opacity=0.7
-            )
+            if data_type.startswith('minute_'):
+                # 分钟K线使用数值索引
+                x_values = list(range(len(plot_data)))
+                hover_text = [f"时间: {dt}<br>成交量: {v}" 
+                            for dt, v in zip(plot_data['datetime'], plot_data['volume'])]
+                
+                volume = go.Bar(
+                    x=x_values,
+                    y=plot_data['volume'],
+                    name='成交量',
+                    marker_color=colors,
+                    opacity=0.7,
+                    hovertext=hover_text,
+                    hoverinfo='text'
+                )
+            else:
+                # 日线使用datetime
+                volume = go.Bar(
+                    x=plot_data['datetime'],
+                    y=plot_data['volume'],
+                    name='成交量',
+                    marker_color=colors,
+                    opacity=0.7
+                )
+            
             self.fig.add_trace(volume, row=2, col=1)
         
         # 设置标题
@@ -169,8 +254,28 @@ class PlotlyChanlunVisualizer:
             )
         )
         
-        # 如果显示成交量，设置成交量图的Y轴
+        # 如果显示成交量，设置成交量图的Y轴和X轴
         if 'volume' in plot_data.columns:
+            # 为成交量图设置X轴格式，确保与K线图一致
+            if data_type.startswith('minute_'):
+                # 使用与K线图相同的刻度设置
+                n_points = len(plot_data)
+                if n_points <= 10:
+                    tick_positions = list(range(n_points))
+                    tick_labels = [dt.strftime('%H:%M') for dt in plot_data['datetime']]
+                else:
+                    step = max(1, n_points // 8)
+                    tick_positions = list(range(0, n_points, step))
+                    tick_labels = [plot_data['datetime'].iloc[i].strftime('%H:%M') for i in tick_positions]
+                
+                self.fig.update_xaxes(
+                    title=f'成交量序号',
+                    tickmode='array',
+                    tickvals=tick_positions,
+                    ticktext=tick_labels,
+                    row=2, col=1
+                )
+            
             self.fig.update_layout(
                 yaxis2=dict(
                     title='成交量',
@@ -211,43 +316,57 @@ class PlotlyChanlunVisualizer:
         
         return self.fig
     
-    def _add_fractals(self, plot_data):
+    def _add_fractals(self, plot_data, data_type='daily'):
         """添加分型标记"""
         fractals = plot_data[plot_data['is_fractal'] & plot_data['fractal_type'].notna()]
         
-        for _, fractal in fractals.iterrows():
+        for idx, fractal in fractals.iterrows():
+            # 根据数据类型确定x坐标
+            if data_type.startswith('minute_'):
+                # 分钟K线使用数值索引
+                x_pos = idx - plot_data.index[0]  # 转换为相对位置
+                hover_text = f"时间: {fractal['datetime']}<br>类型: {'顶分型' if fractal['fractal_type'] == 'top' else '底分型'}"
+            else:
+                # 日线使用datetime
+                x_pos = fractal['datetime']
+                hover_text = f"时间: {fractal['datetime']}<br>类型: {'顶分型' if fractal['fractal_type'] == 'top' else '底分型'}"
+            
             if fractal['fractal_type'] == 'top':
                 # 顶分型
                 marker = go.Scatter(
-                    x=[fractal['datetime']],
+                    x=[x_pos],
                     y=[fractal['high']],
                     mode='markers',
                     marker=dict(
                         symbol='triangle-down',
-                        size=12,
+                        size=6,  # 减小到原来的一半
                         color='red'
                     ),
-                    name='顶分型' if fractal.name == fractals.index[0] else '',
-                    showlegend=bool(fractal.name == fractals.index[0])
+                    name='顶分型' if idx == fractals.index[0] else '',
+                    showlegend=bool(idx == fractals.index[0]),
+                    hovertext=hover_text,
+                    hoverinfo='text'
                 )
             else:
                 # 底分型
                 marker = go.Scatter(
-                    x=[fractal['datetime']],
+                    x=[x_pos],
                     y=[fractal['low']],
                     mode='markers',
                     marker=dict(
                         symbol='triangle-up',
-                        size=12,
+                        size=6,  # 减小到原来的一半
                         color='green'
                     ),
-                    name='底分型' if fractal.name == fractals.index[0] else '',
-                    showlegend=bool(fractal.name == fractals.index[0])
+                    name='底分型' if idx == fractals.index[0] else '',
+                    showlegend=bool(idx == fractals.index[0]),
+                    hovertext=hover_text,
+                    hoverinfo='text'
                 )
             
             self.fig.add_trace(marker, row=1, col=1)
     
-    def _draw_segments(self, plot_data):
+    def _draw_segments(self, plot_data, data_type='daily'):
         """绘制笔"""
         if 'segment_id' not in plot_data.columns:
             return
@@ -265,7 +384,10 @@ class PlotlyChanlunVisualizer:
             if len(segment_data) >= 1:
                 # 笔的起点
                 start_point = segment_data.iloc[0]
-                start_x = start_point['datetime']
+                if data_type.startswith('minute_'):
+                    start_x = start_point.name - plot_data.index[0]  # 转换为相对位置
+                else:
+                    start_x = start_point['datetime']
                 start_y = start_point['high'] if start_point.get('fractal_type') == 'top' else start_point['low']
                 
                 # 笔的终点
@@ -276,7 +398,10 @@ class PlotlyChanlunVisualizer:
                     end_point = self._find_opposite_fractal(start_point, plot_data)
                 
                 if end_point is not None:
-                    end_x = end_point['datetime']
+                    if data_type.startswith('minute_'):
+                        end_x = end_point.name - plot_data.index[0]  # 转换为相对位置
+                    else:
+                        end_x = end_point['datetime']
                     end_y = end_point['high'] if end_point.get('fractal_type') == 'top' else end_point['low']
                     
                     direction = 'up' if start_y < end_y else 'down'

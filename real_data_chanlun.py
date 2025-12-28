@@ -11,14 +11,20 @@ from data_fetcher import AStockDataFetcher
 
 # 优先使用matplotlib可视化，fallback到Plotly版本
 try:
-    from enhanced_visualizer import enhanced_chanlun_visualization
+    # from enhanced_visualizer import enhanced_chanlun_visualization
+    # VISUALIZATION_AVAILABLE = True
+    # VISUALIZATION_TYPE = "matplotlib"
+    from plotly_visualizer import plotly_chanlun_visualization
     VISUALIZATION_AVAILABLE = True
-    VISUALIZATION_TYPE = "matplotlib"
+    VISUALIZATION_TYPE = "plotly"
 except ImportError:
     try:
-        from plotly_visualizer import plotly_chanlun_visualization
+        # from plotly_visualizer import plotly_chanlun_visualization
+        # VISUALIZATION_AVAILABLE = True
+        # VISUALIZATION_TYPE = "plotly"
+        from enhanced_visualizer import enhanced_chanlun_visualization
         VISUALIZATION_AVAILABLE = True
-        VISUALIZATION_TYPE = "plotly"
+        VISUALIZATION_TYPE = "matplotlib"
     except ImportError:
         VISUALIZATION_AVAILABLE = False
         VISUALIZATION_TYPE = None
@@ -40,7 +46,7 @@ def analyze_stock(stock_code, start_date, end_date, data_type='daily', frequency
     """分析单只股票的缠论数据"""
     data_type_name = "日线" if data_type == 'daily' else f"{frequency}分钟线"
     print(f"📊 正在分析 {stock_code} ({data_type_name})...")
-    
+
     # 获取数据
     with AStockDataFetcher() as fetcher:
         if data_type == 'daily':
@@ -59,41 +65,87 @@ def analyze_stock(stock_code, start_date, end_date, data_type='daily', frequency
                 frequency=frequency,
                 adjustflag="2"
             )
-    
+
     if data.empty:
         print(f"❌ 未能获取到 {stock_code} 的数据")
         return None
-    
+
     print(f"✅ 获取数据 {len(data)} 根K线")
-    
+
     # 执行缠论分析
     processor = ChanlunProcessor()
     result = processor.process_klines(data)
     summary = processor.get_processing_summary()
-    
+
     # 显示简要结果
     print(f"🎯 缠论K线: {summary['chanlun_count']} 根")
     if 'fractal_count' in summary:
         print(f"🔺 顶分型: {summary['top_fractal_count']} 个")
         print(f"🔻 底分型: {summary['bottom_fractal_count']} 个")
-    
+
     # 保存结果
     # filename = f"{stock_code}_chanlun.xlsx"
     # result.to_excel(filename, index=False)
     # print(f"💾 已保存: {filename}")
-    
+
     return result
 
+
+def normalize_stock_code(code: str) -> str:
+    """
+    标准化股票代码,自动添加交易所前缀
+
+    Args:
+        code: 用户输入的股票代码,可以是完整格式(sh.600000)或仅数字(600000)
+
+    Returns:
+        标准化后的股票代码,格式: sh.600000 / sz.000001 / bj.830799
+    """
+    # 去除空白字符并转为大写
+    code = str(code).strip().upper()
+
+    # 如果已经是完整格式(包含点),直接返回
+    if "." in code:
+        return code.lower()
+
+    # 如果不是6位数字,保持原样(可能是其他格式)
+    if not code.isdigit() or len(code) != 6:
+        print(f"⚠️  股票代码格式不正确: {code}")
+        return code
+
+    # 根据首位数字判断交易所
+    first_digit = code[0]
+
+    if first_digit == "6":
+        # 上海交易所: 6xxxxx
+        return f"sh.{code}"
+    elif first_digit in ["0", "3"]:
+        # 深圳交易所: 0xxxxx, 3xxxxx
+        return f"sz.{code}"
+    elif first_digit in ["9", "8","4"]:
+        # 北京交易所: 8xxxxx, 4xxxxx
+        print("⚠️  baostock目前不支持北京交易所股票数据")
+        return f"bj.{code}"
+    else:
+        # 未知格式,保持原样并提示
+        print(f"⚠️  无法识别股票代码所属交易所: {code}")
+        return code
 
 def get_user_input():
     """获取用户输入"""
     print("\n📝 请输入分析参数（直接回车使用默认值）：")
     
     # 股票代码默认值
-    stock_code = input("股票代码（默认 sh.600000）: ").strip()
+    stock_code = input("股票代码（默认 600000）: ").strip()
     if not stock_code:
-        stock_code = "sh.600000"
+        stock_code = "600000"
     
+    # 标准化股票代码
+    normalized_code = normalize_stock_code(stock_code)
+    if normalized_code != stock_code:
+        print(f"📝 已自动识别为: {normalized_code}")
+    stock_code = normalized_code
+
     # 开始日期默认值
     start_date = input("开始日期（默认 2024-01-01）: ").strip()
     if not start_date:

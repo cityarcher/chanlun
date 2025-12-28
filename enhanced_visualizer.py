@@ -59,8 +59,9 @@ class EnhancedChanlunVisualizer:
         self.data = plot_data
         self.start_idx = start_idx
         
-        # 创建图表
-        self.fig, self.ax = plt.subplots(figsize=(16, 9))
+        # 创建子图 - K线图和成交量图
+        self.fig, (self.ax, self.ax_volume) = plt.subplots(2, 1, figsize=(16, 10), 
+                                                           gridspec_kw={'height_ratios': [3, 1]})
         
         # 根据数据类型设置标题
         if data_type == 'daily':
@@ -75,6 +76,10 @@ class EnhancedChanlunVisualizer:
         
         # 绘制K线
         self.plot_candlesticks()
+        
+        # 绘制成交量
+        if 'volume' in plot_data.columns:
+            self.plot_volume()
         
         # 标记分型
         if 'is_fractal' in plot_data.columns:
@@ -120,6 +125,23 @@ class EnhancedChanlunVisualizer:
         self.ax.set_xticks(x_ticks)
         self.ax.set_xticklabels(x_labels, rotation=45)
     
+    def plot_volume(self):
+        """绘制成交量"""
+        for i, (idx, row) in enumerate(self.data.iterrows()):
+            # 计算颜色
+            color = 'red' if row['close'] >= row['open'] else 'green'
+            
+            # 绘制成交量柱
+            self.ax_volume.bar(i, row['volume'], color=color, alpha=0.7, width=0.6)
+        
+        # 设置成交量图的x轴（与K线图同步）
+        x_ticks = range(0, len(self.data), max(1, len(self.data) // 10))
+        x_labels = [self.data.iloc[i]['datetime'].strftime('%m-%d') for i in x_ticks]
+        self.ax_volume.set_xticks(x_ticks)
+        self.ax_volume.set_xticklabels(x_labels, rotation=45)
+        self.ax_volume.set_ylabel('成交量', fontsize=10)
+        self.ax_volume.grid(True, alpha=0.3)
+    
     def mark_fractals(self):
         """标记分型"""
         if 'fractal_type' not in self.data.columns:
@@ -132,11 +154,11 @@ class EnhancedChanlunVisualizer:
             
             if fractal['fractal_type'] == 'top':
                 # 顶分型
-                self.ax.scatter(x_pos, fractal['high'], marker='v', s=150, 
+                self.ax.scatter(x_pos, fractal['high'], marker='v', s=75, 
                               color='red', zorder=5, alpha=0.9, label='顶分型' if i == 0 else '')
             else:
                 # 底分型
-                self.ax.scatter(x_pos, fractal['low'], marker='^', s=150, 
+                self.ax.scatter(x_pos, fractal['low'], marker='^', s=75, 
                               color='green', zorder=5, alpha=0.9, label='底分型' if i == 0 else '')
     
     def draw_segments(self):
@@ -203,6 +225,11 @@ class EnhancedChanlunVisualizer:
         
         # 网格
         self.ax.grid(True, alpha=0.3)
+        
+        # 设置成交量图样式
+        if hasattr(self, 'ax_volume'):
+            self.ax_volume.set_title('成交量', fontsize=12)
+            self.ax_volume.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.0f}'))
         
         # y轴格式
         self.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
