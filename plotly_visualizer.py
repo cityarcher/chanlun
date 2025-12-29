@@ -144,7 +144,7 @@ class PlotlyChanlunVisualizer:
         if data_type.startswith('minute_'):
             # 使用数值索引，但保留时间信息用于hover
             x_values = list(range(len(plot_data)))
-            hover_text = [f"时间: {dt}<br>开: {o}<br>高: {h}<br>低: {l}<br>收: {c}" 
+            hover_text = [f"时间: {dt}<br>开: {o:.2f}<br>高: {h:.2f}<br>低: {l:.2f}<br>收: {c:.2f}" 
                         for dt, o, h, l, c in zip(plot_data['datetime'], plot_data['open'], 
                                                   plot_data['high'], plot_data['low'], plot_data['close'])]
             
@@ -192,7 +192,7 @@ class PlotlyChanlunVisualizer:
             if data_type.startswith('minute_'):
                 # 分钟K线使用数值索引
                 x_values = list(range(len(plot_data)))
-                hover_text = [f"时间: {dt}<br>成交量: {v}" 
+                hover_text = [f"时间: {dt}<br>成交量: {v:.2f}" 
                             for dt, v in zip(plot_data['datetime'], plot_data['volume'])]
                 
                 volume = go.Bar(
@@ -322,14 +322,15 @@ class PlotlyChanlunVisualizer:
         
         for idx, fractal in fractals.iterrows():
             # 根据数据类型确定x坐标
+            price_value = fractal['high'] if fractal['fractal_type'] == 'top' else fractal['low']
             if data_type.startswith('minute_'):
                 # 分钟K线使用数值索引
                 x_pos = idx - plot_data.index[0]  # 转换为相对位置
-                hover_text = f"时间: {fractal['datetime']}<br>类型: {'顶分型' if fractal['fractal_type'] == 'top' else '底分型'}"
+                hover_text = f"时间: {fractal['datetime']}<br>类型: {'顶分型' if fractal['fractal_type'] == 'top' else '底分型'}<br>价格: {price_value:.2f}"
             else:
                 # 日线使用datetime
                 x_pos = fractal['datetime']
-                hover_text = f"时间: {fractal['datetime']}<br>类型: {'顶分型' if fractal['fractal_type'] == 'top' else '底分型'}"
+                hover_text = f"时间: {fractal['datetime']}<br>类型: {'顶分型' if fractal['fractal_type'] == 'top' else '底分型'}<br>价格: {price_value:.2f}"
             
             if fractal['fractal_type'] == 'top':
                 # 顶分型

@@ -295,18 +295,26 @@ class EnhancedChanlunVisualizer:
             row = self.data.iloc[idx]
             original_idx = self.data.index[idx]
             
+            # 涨跌计算
+            change = row['close'] - row['open']
+            change_pct = (change / row['open']) * 100 if row['open'] != 0 else 0
+            
             # 构建信息文本
             info_text = (f"时间: {row['datetime'].strftime('%Y-%m-%d %H:%M')}\n"
                         f"开盘: {row['open']:.2f}\n"
                         f"最高: {row['high']:.2f}\n"
                         f"最低: {row['low']:.2f}\n"
                         f"收盘: {row['close']:.2f}\n"
-                        f"涨跌: {row['close'] - row['open']:+.2f}")
+                        f"涨跌: {change:+.2f} ({change_pct:+.2f}%)")
             
             # 添加分型信息
             if row.get('is_fractal') and row.get('fractal_type'):
                 fractal_type_cn = "顶分型" if row['fractal_type'] == 'top' else "底分型"
                 info_text += f"\n🎯 {fractal_type_cn}"
+            
+            # 如果有成交量，添加成交量信息
+            if 'volume' in row and pd.notna(row['volume']):
+                info_text += f"\n成交量: {row['volume']:,.0f}"
             
             # 添加笔信息
             if row.get('is_segment') and row.get('segment_id') is not None:

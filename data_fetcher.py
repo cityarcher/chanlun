@@ -201,7 +201,7 @@ class AStockDataFetcher:
             stock_code: 股票代码，格式：sh.600000 或 sz.000001
             start_date: 开始日期，格式：YYYY-MM-DD
             end_date: 结束日期，格式：YYYY-MM-DD
-            frequency: 分钟频率，可选值：'1', '5', '15', '30', '60'
+            frequency: 分钟频率，可选值：'5', '15', '30', '60'
             adjustflag: 复权类型，'3'=不复权，'1'=后复权，'2'=前复权
             
         Returns:
