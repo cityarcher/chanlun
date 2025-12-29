@@ -3,3 +3,6 @@ numpy>=1.21.0
 plotly>=5.0.0
 matplotlib>=3.5.0
 mpld3>=0.5.0
+baostock>=0.8.8
+pytdx>=1.72
+mootdx>=0.4.6
