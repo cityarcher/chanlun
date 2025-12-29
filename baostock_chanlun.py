@@ -7,7 +7,7 @@ import numpy as np
 import os
 from datetime import datetime, timedelta
 from chanlun_processor import ChanlunProcessor
-from data_fetcher import AStockDataFetcher
+from baostock_data_fetcher import AStockDataFetcher
 
 # 优先使用matplotlib可视化，fallback到Plotly版本
 try:
@@ -40,6 +40,22 @@ def get_previous_workday():
         if previous_day.weekday() < 5:  # 0-4 表示周一到周五
             return previous_day.strftime('%Y-%m-%d')
         offset += 1
+
+
+def is_workday(date=None):
+    """判断是否为工作日"""
+    if date is None:
+        date = datetime.now()
+    return date.weekday() < 5  # 0-4 表示周一到周五
+
+
+def get_default_end_date():
+    """获取默认结束日期：如果今天是工作日则用今天，否则用上一个工作日"""
+    today = datetime.now()
+    if is_workday(today):
+        return today.strftime('%Y-%m-%d')
+    else:
+        return get_previous_workday()
 
 
 def analyze_stock(stock_code, start_date, end_date, data_type='daily', frequency='30'):
@@ -152,7 +168,7 @@ def get_user_input():
         start_date = "2024-01-01"
     
     # 结束日期默认值
-    default_end_date = get_previous_workday()
+    default_end_date = get_default_end_date()
     end_date = input(f"结束日期（默认 {default_end_date}）: ").strip()
     if not end_date:
         end_date = default_end_date
