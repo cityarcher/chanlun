@@ -16,7 +16,7 @@
 ```
 chanlun/
 ├── chanlun_processor.py      # 缠论核心算法处理器
-├── data_fetcher.py           # A股数据获取工具
+├── baostock_data_fetcher.py   # A股数据获取工具
 ├── real_data_chanlun.py      # 主程序入口
 ├── enhanced_visualizer.py    # Matplotlib增强版可视化
 ├── plotly_visualizer.py      # Plotly交互式可视化
@@ -49,21 +49,21 @@ chanlun/
    - 接近分型筛选：处理间隔过小的分型对
 5. **笔识别**：按交叉原则连接分型形成笔
 
-### 2. 数据获取 (data_fetcher.py)
+### 2. 数据获取 (baostock_data_fetcher.py)
 
 **AStockDataFetcher类**提供A股数据获取功能：
 
 - 支持日K线和分钟K线获取
 - 基于baostock接口
 - 自动数据清洗和异常值处理
-- 支持批量获取多只股票
+
 - 前复权/后复权/不复权选项
 
 #### 主要方法：
 
 - `get_daily_data()`: 获取日K线数据
 - `get_minute_data()`: 获取分钟K线数据
-- `batch_get_data()`: 批量获取多只股票数据
+
 - `get_stock_basic_info()`: 获取股票基本信息
 
 ### 3. 交互式分析工具 (real_data_chanlun.py)
@@ -125,7 +125,7 @@ python real_data_chanlun.py
 
 ```python
 from chanlun_processor import ChanlunProcessor
-from data_fetcher import AStockDataFetcher
+from baostock_data_fetcher import AStockDataFetcher
 from enhanced_visualizer import enhanced_chanlun_visualization
 
 # 获取数据
@@ -144,18 +144,19 @@ result = processor.process_klines(data)
 enhanced_chanlun_visualization(result)
 ```
 
-### 3. 批量分析
+### 3. 多股分析
 
 ```python
-# 批量获取多只股票数据
+# 分别获取多只股票数据
 stocks = ["sh.600000", "sz.000001", "sh.600519"]
 with AStockDataFetcher() as fetcher:
-    batch_data = fetcher.batch_get_data(
-        stock_codes=stocks,
-        start_date="2024-01-01",
-        end_date="2024-12-31",
-        data_type="daily"
-    )
+    for stock_code in stocks:
+        data = fetcher.get_daily_data(
+            stock_code=stock_code,
+            start_date="2024-01-01",
+            end_date="2024-12-31"
+        )
+        # 处理数据...
 ```
 
 ## 输出说明
@@ -267,7 +268,7 @@ K线合并完成：原始 73 根K线合并为 45 根缠论K线
 项目采用模块化设计，易于扩展：
 
 1. **新指标**：在`chanlun_processor.py`中添加新的分析方法
-2. **数据源**：在`data_fetcher.py`中添加新的数据接口
+2. **数据源**：在`baostock_data_fetcher.py`中添加新的数据接口
 3. **可视化**：创建新的可视化模块
 4. **策略**：基于缠论信号开发交易策略
 
