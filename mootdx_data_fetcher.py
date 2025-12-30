@@ -292,29 +292,11 @@ class MootdxDataFetcher:
             if col in cleaned_df.columns:
                 # 移除价格为0或负数的记录
                 cleaned_df = cleaned_df[cleaned_df[col] > 0]
-                
-                # 处理极端异常值（价格偏离超过3个标准差）
-                mean_val = cleaned_df[col].mean()
-                std_val = cleaned_df[col].std()
-                if std_val > 0:
-                    upper_bound = mean_val + 3 * std_val
-                    lower_bound = mean_val - 3 * std_val
-                    cleaned_df = cleaned_df[
-                        (cleaned_df[col] >= lower_bound) & 
-                        (cleaned_df[col] <= upper_bound)
-                    ]
         
         # 处理成交量异常值
         if 'volume' in cleaned_df.columns:
             # 移除成交量为0或负数的记录
             cleaned_df = cleaned_df[cleaned_df['volume'] >= 0]
-            
-            # 处理成交量极端异常值
-            volume_mean = cleaned_df['volume'].mean()
-            volume_std = cleaned_df['volume'].std()
-            if volume_std > 0 and volume_mean > 0:
-                volume_upper = volume_mean + 5 * volume_std  # 成交量允许更大的波动
-                cleaned_df = cleaned_df[cleaned_df['volume'] <= volume_upper]
         
         # 检查价格逻辑：high >= low, high >= open/close, low <= open/close
         if all(col in cleaned_df.columns for col in ['open', 'high', 'low', 'close']):
