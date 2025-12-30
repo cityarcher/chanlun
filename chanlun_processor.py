@@ -172,8 +172,7 @@ class ChanlunProcessor:
         2. 包含关系：一根K线完全包含另一根K线（即高低价都包含另一根的高低价）
         3. 方向判断：根据已经处理好的缠论K线的最后2根来判断方向
            - 如果后一根K线高价更高，方向向上
-           - 如果后一根K线低价更低，方向向上
-           - 否则方向向下
+           - 如果后一根K线低价更低，方向向下
         4. 合并规则：
            - 向上时：高价取高者，低价取高者
            - 向下时：高价取低者，低价取低者
@@ -242,7 +241,7 @@ class ChanlunProcessor:
                     
                     # 创建合并后的K线
                     merged_kline = pd.Series({
-                        'datetime': last_in_group['datetime'],
+                        'datetime': chanlun_group[0]['datetime'],  # ✅ 正确：使用第一根的时间
                         'open': chanlun_group[0]['open'],
                         'high': merged_high,
                         'low': merged_low,
