@@ -78,6 +78,10 @@ def get_market_type(stock_code: str) -> str:
         # 港股数字代码，如00700
         return 'hk'
     
+    # 如果包含交易所前缀，提取纯数字部分进行判断
+    if '.' in code:
+        code = code.split('.')[1]
+    
     # ETF代码识别
     if code.startswith('5') or (code.startswith('15') and len(code) == 6):
         return 'etf'
