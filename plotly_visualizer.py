@@ -39,7 +39,7 @@ class PlotlyChanlunVisualizer:
         return ((morning_start <= time <= morning_end) or 
                 (afternoon_start <= time <= afternoon_end))
         
-    def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily', show_plot=True):
+    def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily', show_plot=True, stock_code=None):
         """
         绘制带丰富交互功能的缠论K线图
         
@@ -49,6 +49,7 @@ class PlotlyChanlunVisualizer:
             bars_to_show: 显示的K线数量
             data_type: K线类型 ('daily' 或 'minute')
             show_plot: 是否显示图形
+            stock_code: 股票代码（显示在标题中）
         """
         # 数据验证
         required_columns = ['datetime', 'open', 'high', 'low', 'close']
@@ -216,14 +217,15 @@ class PlotlyChanlunVisualizer:
             
             self.fig.add_trace(volume, row=2, col=1)
         
-        # 设置标题
+        # 设置标题（包含股票代码）
+        code_suffix = f' - {stock_code}' if stock_code else ''
         if data_type == 'daily':
-            title = '缠论K线分析图表（Plotly版）- 日线'
+            title = f'缠论K线分析图表（Plotly版）- 日线{code_suffix}'
         elif data_type.startswith('minute_'):
             freq = data_type.split('_')[1]
-            title = f'缠论K线分析图表（Plotly版）- {freq}分钟线'
+            title = f'缠论K线分析图表（Plotly版）- {freq}分钟线{code_suffix}'
         else:
-            title = '缠论K线分析图表（Plotly版）'
+            title = f'缠论K线分析图表（Plotly版）{code_suffix}'
         
         # 更新布局 - 增加坐标调节功能，优化主体图高度
         self.fig.update_layout(
@@ -446,7 +448,7 @@ class PlotlyChanlunVisualizer:
             print("没有可显示的图表")
 
 
-def plotly_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type='daily', return_fig=False):
+def plotly_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type='daily', return_fig=False, stock_code=None):
     """
     基于Plotly的缠论K线可视化函数
     
@@ -456,6 +458,7 @@ def plotly_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type=
         bars_to_show: 显示的K线数量
         data_type: K线类型 ('daily' 或 'minute')
         return_fig: 是否返回Figure对象而不显示
+        stock_code: 股票代码（显示在标题中）
     
     Returns:
         Plotly Figure对象 (当return_fig=True时)
@@ -463,7 +466,7 @@ def plotly_chanlun_visualization(data, start_idx=0, bars_to_show=100, data_type=
     visualizer = PlotlyChanlunVisualizer()
     # 如果只是返回图形对象，不显示图形
     show_plot = not return_fig
-    fig = visualizer.plot_chanlun_with_interaction(data, start_idx, bars_to_show, data_type, show_plot=show_plot)
+    fig = visualizer.plot_chanlun_with_interaction(data, start_idx, bars_to_show, data_type, show_plot=show_plot, stock_code=stock_code)
     
     if return_fig:
         return fig

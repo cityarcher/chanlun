@@ -26,7 +26,7 @@ class EnhancedChanlunVisualizer:
         self.cursor = None
         self.annotation = None
         
-    def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily', show_plot=True):
+    def plot_chanlun_with_interaction(self, data, start_idx=0, bars_to_show=100, data_type='daily', show_plot=True, stock_code=None):
         """
         绘制带交互功能的缠论K线图
         
@@ -36,6 +36,7 @@ class EnhancedChanlunVisualizer:
             bars_to_show: 显示的K线数量
             data_type: K线类型 ('daily' 或 'minute')
             show_plot: 是否显示图形
+            stock_code: 股票代码（显示在标题中）
         """
         # 数据验证
         required_columns = ['datetime', 'open', 'high', 'low', 'close']
@@ -58,12 +59,13 @@ class EnhancedChanlunVisualizer:
         # 保存数据引用
         self.data = plot_data
         self.start_idx = start_idx
+        self.stock_code = stock_code  # 保存股票代码
         
         # 创建子图 - K线图和成交量图
         self.fig, (self.ax, self.ax_volume) = plt.subplots(2, 1, figsize=(16, 10), 
                                                            gridspec_kw={'height_ratios': [3, 1]})
         
-        # 根据数据类型设置标题
+        # 根据数据类型设置标题（包含股票代码）
         if data_type == 'daily':
             data_type_name = "日线"
         elif data_type.startswith('minute_'):
@@ -72,7 +74,9 @@ class EnhancedChanlunVisualizer:
         else:
             data_type_name = "分钟线"
         
-        self.fig.suptitle(f'缠论K线分析图表（增强版）- {data_type_name}', fontsize=16, fontweight='bold')
+        # 在标题中显示股票代码
+        code_suffix = f' - {stock_code}' if stock_code else ''
+        self.fig.suptitle(f'缠论K线分析图表（增强版）- {data_type_name}{code_suffix}', fontsize=16, fontweight='bold')
         
         # 绘制K线
         self.plot_candlesticks()
@@ -218,7 +222,9 @@ class EnhancedChanlunVisualizer:
     
     def setup_chart_style(self, end_idx):
         """设置图表样式"""
-        self.ax.set_title(f'缠论K线图 (显示 {self.start_idx+1}-{end_idx} 根K线)', 
+        # 在标题中显示股票代码
+        code_suffix = f' - {self.stock_code}' if hasattr(self, 'stock_code') and self.stock_code else ''
+        self.ax.set_title(f'缠论K线图{code_suffix} (显示 {self.start_idx+1}-{end_idx} 根K线)', 
                          fontsize=14, fontweight='bold')
         self.ax.set_xlabel('时间', fontsize=12)
         self.ax.set_ylabel('价格', fontsize=12)

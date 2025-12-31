@@ -884,38 +884,71 @@ class MootdxDataFetcher:
                         
                         # 分批次获取数据
                         all_data = None
-                        offset_per_batch = 700  # 港股每次获取700条
+                        batch_size = 700  # 每批固定获取700条
                         current_start = 0
+                        empty_batch_count = 0  # 记录连续空批次数
+                        max_empty_batches = 2   # 最多允许2次连续空批
                         
-                        while current_start < required_klines:
-                            current_offset = min(offset_per_batch, required_klines - current_start)
+                        while current_start < required_klines and empty_batch_count < max_empty_batches:
+                            # 每批固定获取batch_size条，而不是动态计算
+                            current_offset = batch_size
                             
-                            print(f"获取第 {current_start//offset_per_batch + 1} 批港股数据（市场参数{market_param}）：{current_offset} 条")
+                            print(f"获取第 {current_start//batch_size + 1} 批港股数据（市场参数{market_param}）：{current_offset} 条")
                             
-                            batch_data = client.bars(
-                                frequency=mootdx_freq, # 频率
-                                market=market_param,    # 港股市场参数
-                                symbol=code,           # 港股代码
-                                start=current_start,    # 从指定位置开始
-                                offset=current_offset,  # 获取指定数量
-                                adjust='qfq'             # 港股支持复权，默认前复权
-                            )
-                            
-                            if batch_data is not None and not batch_data.empty:
-                                if all_data is None:
-                                    all_data = batch_data
+                            try:
+                                batch_data = client.bars(
+                                    frequency=mootdx_freq, # 频率
+                                    market=market_param,    # 港股市场参数
+                                    symbol=code,           # 港股代码
+                                    start=current_start,    # 从指定位置开始
+                                    offset=current_offset,  # 获取指定数量
+                                    adjust='qfq'             # 港股支持复权，默认前复权
+                                )
+                                
+                                if batch_data is not None and not batch_data.empty:
+                                    if all_data is None:
+                                        all_data = batch_data
+                                    else:
+                                        # 合并DataFrame
+                                        all_data = pd.concat([all_data, batch_data], ignore_index=True)
+                                    current_start += current_offset
+                                    empty_batch_count = 0  # 重置空批计数器
+                                    print(f"  ✓ 批次获取成功，累计 {len(all_data)} 条数据")
                                 else:
-                                    # 合并DataFrame
-                                    all_data = pd.concat([all_data, batch_data], ignore_index=True)
-                                current_start += current_offset
-                            else:
-                                print(f"第 {current_start//offset_per_batch + 1} 批港股数据获取为空，停止获取")
-                                break
+                                    empty_batch_count += 1
+                                    print(f"  ⚠️  第 {current_start//batch_size + 1} 批港股数据为空（连续空批{empty_batch_count}次）")
+                                    if empty_batch_count >= max_empty_batches:
+                                        print(f"  ⚠️  连续{max_empty_batches}次获取失败，停止分批获取")
+                                        break
+                                    # 添加短暂延迟避免触发API限制
+                                    import time
+                                    time.sleep(1)
+                            except SyntaxError as e:
+                                # 捕获mootdx内部语法错误
+                                print(f"  ❌ mootdx内部语法错误（可能是库版本问题）: {e}")
+                                print(f"  💡 建议：使用日线数据或升级mootdx库（pip install --upgrade mootdx）")
+                                empty_batch_count += 1
+                                if empty_batch_count >= max_empty_batches:
+                                    print(f"  ⚠️  连续{max_empty_batches}次获取失败，停止分批获取")
+                                    break
+                                import time
+                                time.sleep(1)
+                            except Exception as e:
+                                print(f"  ❌ 批次获取异常: {e}")
+                                empty_batch_count += 1
+                                if empty_batch_count >= max_empty_batches:
+                                    print(f"  ⚠️  连续{max_empty_batches}次获取失败，停止分批获取")
+                                    break
+                                import time
+                                time.sleep(1)
                         
                         if all_data is not None and not all_data.empty:
                             data = all_data
                             print(f"✅ 港股分批获取完成，共获取 {len(data)} 条数据")
                             print(f"✓ 使用港股市场参数 {market_param} 成功获取数据")
+                            break
+                        else:
+                            print(f"⚠️  未获取到任何港股数据（市场参数 {market_param}）")
                             break
                         
                 except Exception as e:
@@ -1083,13 +1116,14 @@ class MootdxDataFetcher:
                 
                 # 分批次获取数据
                 all_data = None
-                offset_per_batch = 800  # 每次获取800条
+                batch_size = 800  # 每批固定获取800条
                 current_start = 0
                 
                 while current_start < required_klines:
-                    current_offset = min(offset_per_batch, required_klines - current_start)
+                    # 每批固定获取batch_size条，而不是动态计算
+                    current_offset = batch_size
                     
-                    print(f"获取第 {current_start//offset_per_batch + 1} 批ETF数据：{current_offset} 条")
+                    print(f"获取第 {current_start//batch_size + 1} 批ETF数据：{current_offset} 条")
                     
                     batch_data = client.bars(
                         frequency=mootdx_freq, # 频率
@@ -1300,13 +1334,14 @@ class MootdxDataFetcher:
                 
                 # 分批次获取数据
                 all_data = None
-                offset_per_batch = 800  # 每次获取800条
+                batch_size = 800  # 每批固定获取800条
                 current_start = 0
                 
                 while current_start < required_klines:
-                    current_offset = min(offset_per_batch, required_klines - current_start)
+                    # 每批固定获取batch_size条，而不是动态计算
+                    current_offset = batch_size
                     
-                    print(f"获取第 {current_start//offset_per_batch + 1} 批指数数据：{current_offset} 条")
+                    print(f"获取第 {current_start//batch_size + 1} 批指数数据：{current_offset} 条")
                     
                     batch_data = client.index(
                         frequency=mootdx_freq, # 频率

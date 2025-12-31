@@ -209,7 +209,7 @@ def create_and_save_chart(result, stock_code, start_date, end_date, data_type):
         if VISUALIZATION_TYPE == "plotly":
             # 使用Plotly版本创建图表并保存HTML
             chart_obj = plotly_chanlun_visualization(result, start_idx=0, bars_to_show=len(result), 
-                                                     data_type=data_type, return_fig=True)
+                                                     data_type=data_type, return_fig=True, stock_code=stock_code)
             if chart_obj is not None:
                 chart_obj.write_html(filepath, include_plotlyjs='cdn')
                 print(f"✅ HTML文件已保存: {filepath}")
@@ -219,7 +219,7 @@ def create_and_save_chart(result, stock_code, start_date, end_date, data_type):
             from enhanced_visualizer import EnhancedChanlunVisualizer
             chart_obj = EnhancedChanlunVisualizer()
             chart_obj.plot_chanlun_with_interaction(result, start_idx=0, bars_to_show=len(result), 
-                                                    data_type=data_type, show_plot=False)
+                                                    data_type=data_type, show_plot=False, stock_code=stock_code)
             
             try:
                 # 将matplotlib图形保存为HTML
