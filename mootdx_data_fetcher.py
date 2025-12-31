@@ -627,124 +627,177 @@ class MootdxDataFetcher:
             adjust_map = {'1': 'hfq', '2': 'qfq', '3': None}  # 1=后复权, 2=前复权, 3=不复权
             mootdx_adjust = adjust_map.get(adjustflag, 'qfq')  # 默认前复权
             
-            # 使用client.bars()获取分钟数据
-            print(f"尝试获取{frequency}分钟K线数据...")
-            try:
-                # 根据mootdx文档，频率映射：
-                # 0->5分钟, 1->15分钟, 2->30分钟, 3->1小时
-                freq_map = {
-                    '1': 0,      # 5分钟（mootdx不支持1分钟，用5分钟代替）
-                    '5': 0,      # 5分钟  
-                    '15': 1,     # 15分钟
-                    '30': 2,     # 30分钟
-                    '60': 3      # 1小时
-                }
-                
-                mootdx_freq = freq_map.get(frequency, 2)  # 默认30分钟
-                
-                # 根据adjustflag映射到mootdx的复权参数
-                adjust_map = {'1': 'hfq', '2': 'qfq', '3': None}  # 1=后复权, 2=前复权, 3=不复权
-                mootdx_adjust = adjust_map.get(adjustflag, 'qfq')  # 默认前复权
-                
-                print(f"API调用参数：")
-                print(f"   frequency={mootdx_freq}")
-                print(f"   symbol={pure_code}")
-                print(f"   market={market}")
-                print(f"   adjust={mootdx_adjust}")
-                
-                # 获取分钟数据 - 直接返回DataFrame
-                df = client.bars(
-                    frequency=mootdx_freq,   # 频率参数
-                    symbol=pure_code,        # 股票代码（6位数字）
-                    start=0,                 # 从最新数据开始
-                    offset=800,              # 获取最多800条数据
-                    adjust=mootdx_adjust,    # 复权类型
-                    market=market            # 市场参数
-                )
-                
-                print(f"📊 直接获取数据结果：")
-                print(f"   数据类型: {type(df)}")
-                print(f"   数据长度: {len(df) if not df.empty else 0}")
-                
-                if df is None or df.empty:
-                    print(f"⚠️  未获取到{frequency}分钟数据")
-                    print("💡 建议使用日线数据进行缠论分析（日线更适合识别笔和线段）")
-                    return pd.DataFrame()
-                
-                # 调试信息：显示获取到的数据结构
-                print(f"获取到的原始数据结构：{df.shape if not df.empty else '空数据'}")
-                if not df.empty:
-                    print(f"数据列：{df.columns.tolist()}")
-                    print(f"数据样例：\n{df.head(2)}")
-                
-                # 重命名列以匹配标准格式
-                if 'date' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['date'])
-                    df = df.drop(columns=['date'])
-                elif 'time' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['time'], format='%Y%m%d%H%M%S', errors='coerce')
-                    df = df.drop(columns=['time'])
-                elif hasattr(df.index, 'name') and df.index.name == 'datetime':
-                    # 如果datetime是索引名，将其转换为列
-                    df = df.reset_index()
-                elif hasattr(df.index, 'name') and df.index.name == 'date':
-                    # 如果date是索引名，将其转换为列
-                    df = df.reset_index()
-                    df['datetime'] = pd.to_datetime(df['date'])
-                    df = df.drop(columns=['date'])
-                
-                # 检查是否成功创建了datetime列
-                if 'datetime' not in df.columns:
-                    print("❌ 错误：无法创建datetime列，可能是数据格式问题")
-                    print(f"可用列：{df.columns.tolist()}")
-                    print(f"索引信息：{df.index.name}")
-                    return pd.DataFrame()
-                
-                # 确保必需列存在
-                required_columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount', 'code']
-                for col in required_columns:
-                    if col not in df.columns:
-                        if col == 'code':
-                            df[col] = code
-                        elif col in ['volume', 'amount']:
-                            df[col] = 0
-                
-                # 按日期范围过滤数据（增加错误处理）
+            # 计算需要获取的K线数量（A股每天交易4小时）
+            def calculate_required_klines(start_date: str, end_date: str, frequency: str) -> int:
+                """根据时间段和频率计算需要获取的K线数量"""
+                from datetime import datetime
+
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                days_diff = (end_dt - start_dt).days + 1  # 包含结束日期
+
+                # A股每天交易4小时，按分钟计算
+                trading_minutes_per_day = 4 * 60  # 4小时 = 240分钟
+
+                # 根据频率计算每天的数量
+                if frequency == '5':
+                    klines_per_day = trading_minutes_per_day // 5
+                elif frequency == '15':
+                    klines_per_day = trading_minutes_per_day // 15
+                elif frequency == '30':
+                    klines_per_day = trading_minutes_per_day // 30
+                elif frequency == '60':
+                    klines_per_day = trading_minutes_per_day // 60
+                else:
+                    klines_per_day = trading_minutes_per_day // 30  # 默认30分钟
+
+                required_klines = days_diff * klines_per_day + 200  # 加上200缓冲
+                return required_klines
+
+            required_klines = calculate_required_klines(start_date, end_date, frequency)
+            print(f"根据时间段计算需要获取约 {required_klines} 条{frequency}分钟K线数据")
+
+            # 分批次获取数据
+            all_data = None
+            batch_size = 800  # 每批固定获取800条
+            current_start = 0
+            empty_batch_count = 0  # 记录连续空批次数
+            max_empty_batches = 2   # 最多允许2次连续空批
+
+            while current_start < required_klines and empty_batch_count < max_empty_batches:
+                # 每批固定获取batch_size条，而不是动态计算
+                current_offset = batch_size
+
+                print(f"获取第 {current_start//batch_size + 1} 批{frequency}分钟数据：{current_offset} 条")
+
                 try:
-                    start_dt = pd.to_datetime(start_date)
-                    end_dt = pd.to_datetime(end_date)
-                    
-                    # 确保datetime列是datetime类型
-                    df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
-                    
-                    # 检查datetime列是否有有效数据
-                    if df['datetime'].isna().all():
-                        print("❌ 错误：datetime列全部为空值")
-                        return pd.DataFrame()
-                    
-                    # 按日期范围过滤
-                    df = df[(df['datetime'] >= start_dt) & (df['datetime'] <= end_dt)]
-                    
-                    if df.empty:
-                        print(f"⚠️  警告：按日期范围过滤后数据为空")
-                        print(f"数据时间范围：{start_date} 到 {end_date}")
-                        return pd.DataFrame()
-                        
-                except Exception as filter_error:
-                    print(f"❌ 日期过滤出错：{filter_error}")
-                    return pd.DataFrame()
-                
-                # 数据清洗
-                cleaned_df = self._clean_data(df)
-                
-                print(f"✅ 成功获取{frequency}分钟数据 {len(cleaned_df)} 条")
-                return cleaned_df
-                
-            except Exception as e:
-                print(f"获取分钟K线数据异常: {e}")
+                    batch_data = client.bars(
+                        frequency=mootdx_freq, # 频率
+                        symbol=pure_code,        # 股票代码（6位数字）
+                        start=current_start,    # 从指定位置开始
+                        offset=current_offset,  # 获取指定数量
+                        adjust=mootdx_adjust,   # 复权类型
+                        market=market          # 市场参数
+                    )
+
+                    if batch_data is not None and not batch_data.empty:
+                        if all_data is None:
+                            all_data = batch_data
+                        else:
+                            # 合并DataFrame
+                            all_data = pd.concat([all_data, batch_data], ignore_index=True)
+                        current_start += current_offset
+                        empty_batch_count = 0  # 重置空批计数器
+                        print(f"  ✓ 批次获取成功，累计 {len(all_data)} 条数据")
+                    else:
+                        empty_batch_count += 1
+                        print(f"  ⚠️  第 {current_start//batch_size + 1} 批{frequency}分钟数据为空（连续空批{empty_batch_count}次）")
+                        if empty_batch_count >= max_empty_batches:
+                            print(f"  ⚠️  连续{max_empty_batches}次获取失败，停止分批获取")
+                            break
+                        # 添加短暂延迟避免触发API限制
+                        import time
+                        time.sleep(1)
+                except SyntaxError as e:
+                    # 捕获mootdx内部语法错误
+                    print(f"  ❌ mootdx内部语法错误（可能是库版本问题）: {e}")
+                    print(f"  💡 建议：使用日线数据或升级mootdx库（pip install --upgrade mootdx）")
+                    empty_batch_count += 1
+                    if empty_batch_count >= max_empty_batches:
+                        print(f"  ⚠️  连续{max_empty_batches}次获取失败，停止分批获取")
+                        break
+                    import time
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"  ❌ 批次获取异常: {e}")
+                    empty_batch_count += 1
+                    if empty_batch_count >= max_empty_batches:
+                        print(f"  ⚠️  连续{max_empty_batches}次获取失败，停止分批获取")
+                        break
+                    import time
+                    time.sleep(1)
+
+            data = all_data if all_data is not None else pd.DataFrame()
+            print(f"✅ {frequency}分钟数据分批获取完成，共获取 {len(data)} 条数据")
+
+            if data is None or len(data) == 0:
+                print(f"⚠️  未获取到{frequency}分钟数据")
                 print("💡 建议使用日线数据进行缠论分析（日线更适合识别笔和线段）")
                 return pd.DataFrame()
-            
+
+            # 调试信息：显示获取到的数据结构
+            print(f"获取到的原始数据结构：{data.shape if not data.empty else '空数据'}")
+            if not data.empty:
+                print(f"数据列：{data.columns.tolist()}")
+                print(f"数据样例：\n{data.head(2)}")
+
+            # 重命名列以匹配标准格式
+            df = data
+            if 'date' in df.columns:
+                df['datetime'] = pd.to_datetime(df['date'])
+                df = df.drop(columns=['date'])
+            elif 'time' in df.columns:
+                df['datetime'] = pd.to_datetime(df['time'], format='%Y%m%d%H%M%S', errors='coerce')
+                df = df.drop(columns=['time'])
+            elif hasattr(df.index, 'name') and df.index.name == 'datetime':
+                # 如果datetime是索引名，将其转换为列
+                df = df.reset_index()
+            elif hasattr(df.index, 'name') and df.index.name == 'date':
+                # 如果date是索引名，将其转换为列
+                df = df.reset_index()
+                df['datetime'] = pd.to_datetime(df['date'])
+                df = df.drop(columns=['date'])
+
+            # 检查是否成功创建了datetime列
+            if 'datetime' not in df.columns:
+                print("❌ 错误：无法创建datetime列，可能是数据格式问题")
+                print(f"可用列：{df.columns.tolist()}")
+                print(f"索引信息：{df.index.name}")
+                return pd.DataFrame()
+
+            # 确保必需列存在
+            required_columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount', 'code']
+            for col in required_columns:
+                if col not in df.columns:
+                    if col == 'code':
+                        df[col] = code
+                    elif col in ['volume', 'amount']:
+                        df[col] = 0
+
+            # 按日期范围过滤数据（增加错误处理）
+            try:
+                start_dt = pd.to_datetime(start_date)
+                end_dt = pd.to_datetime(end_date)
+
+                # 确保datetime列是datetime类型
+                df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+
+                # 检查datetime列是否有有效数据
+                if df['datetime'].isna().all():
+                    print("❌ 错误：datetime列全部为空值")
+                    return pd.DataFrame()
+
+                # 按日期范围过滤
+                original_len = len(df)
+                df = df[(df['datetime'] >= start_dt) & (df['datetime'] <= end_dt)]
+
+                if df.empty:
+                    print(f"⚠️  警告：按日期范围过滤后数据为空")
+                    print(f"数据时间范围：{start_date} 到 {end_date}")
+                    return pd.DataFrame()
+                else:
+                    print(f"{frequency}分钟数据时间筛选：{original_len} -> {len(df)} 条")
+
+            except Exception as filter_error:
+                print(f"❌ 日期过滤出错：{filter_error}")
+                return pd.DataFrame()
+
+            # 数据清洗
+            cleaned_df = self._clean_data(df)
+
+            print(f"✅ 成功获取{frequency}分钟数据 {len(cleaned_df)} 条")
+            return cleaned_df
+
         except Exception as e:
             print(f"获取分钟K线数据异常: {e}")
             import traceback
