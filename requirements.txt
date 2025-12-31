@@ -6,3 +6,4 @@ mpld3>=0.5.0
 baostock>=0.8.8
 pytdx>=1.72
 mootdx>=0.4.6
+streamlit>=1.28.0
