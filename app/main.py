@@ -26,50 +26,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定义CSS样式
-st.markdown("""
-<style>
-    .main-title {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #1E3A8A;
-        text-align: center;
-        margin-bottom: 1rem;
-        padding: 1rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        font-weight: 600;
-        border: none;
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-    .metric-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    .chart-container {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-        margin-top: 1rem;
-    }
-</style>
-""", unsafe_allow_html=True)
+
 
 
 def get_previous_workday():
@@ -265,8 +222,7 @@ def cached_analysis(stock_code, start_date, end_date, data_source, data_type, fr
 def main():
     """主函数"""
     # 标题
-    st.markdown('<div class="main-title">📊 缠论K线分析工具</div>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; color: #4B5563; margin-bottom: 2rem;">支持A股、ETF、港股、指数的多市场缠论分析</p>', unsafe_allow_html=True)
+    #st.markdown('<div class="main-title">📊 缠论K线分析工具</div>', unsafe_allow_html=True)
 
     # 侧边栏参数配置
     with st.sidebar:
@@ -322,25 +278,6 @@ def main():
         # 分析按钮
         analyze_button = st.button("🚀 开始分析", use_container_width=True)
 
-        # 帮助信息
-        with st.expander("📖 使用说明"):
-            st.markdown("""
-            **支持的股票代码格式:**
-            - A股: 600000 或 sh.600000
-            - 深股: 000001 或 sz.000001
-            - ETF: 588000 或 159915
-            - 指数: 000001 或 399001
-            - 港股: 00700 或 00700.HK
-
-            **数据源说明:**
-            - **mootdx**: 支持A股、ETF、港股、指数,数据更新快
-            - **baostock**: 仅支持A股,数据更稳定
-
-            **注意事项:**
-            - 港股和指数只能使用mootdx数据源
-            - 分钟数据可能有限制,建议优先使用日线
-            """)
-
     # 主内容区
     if analyze_button or ('last_analyzed' in st.session_state and st.session_state.last_analyzed == stock_code_input):
 
@@ -373,26 +310,8 @@ def main():
                     frequency
                 )
 
-                # 显示成功消息
-                st.success(f"✅ 分析完成! 共获取 {len(result)} 根K线")
-
-                # 显示统计信息
-                data_type_name = "日线" if data_type == 'daily' else f"{frequency}分钟线"
-                st.markdown("### 📊 分析统计")
-
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("K线数量", summary['chanlun_count'])
-                with col2:
-                    if 'top_fractal_count' in summary:
-                        st.metric("顶分型", summary['top_fractal_count'])
-                with col3:
-                    if 'bottom_fractal_count' in summary:
-                        st.metric("底分型", summary['bottom_fractal_count'])
-
                 # 生成图表
-                st.markdown("### 📈 缠论K线图表")
-                st.markdown(f'<div class="chart-container">', unsafe_allow_html=True)
+                #st.markdown("### 📈 缠论K线图表")
 
                 data_type_with_freq = data_type if data_type == 'daily' else f"minute_{frequency}"
                 chart_obj = plotly_chanlun_visualization(
@@ -411,11 +330,8 @@ def main():
                 else:
                     st.error("❌ 图表生成失败!")
 
-                st.markdown('</div>', unsafe_allow_html=True)
-
             except Exception as e:
                 st.error(f"❌ 分析失败: {str(e)}")
-                st.info("💡 提示: 请检查网络连接或尝试切换数据源")
 
 
 if __name__ == "__main__":

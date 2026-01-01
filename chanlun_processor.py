@@ -446,17 +446,17 @@ class ChanlunProcessor:
         
         return result_df
     
-    def filter_fractals_by_extremes(self, df: pd.DataFrame, window: int = 5) -> pd.DataFrame:
+    def filter_fractals_by_extremes(self, df: pd.DataFrame, window: int = 4) -> pd.DataFrame:
         """
         根据极值筛选分型
         
         规则：
-        - 对于标记为底分型的K线，如果其低价不是前面5根K线以及后面5根K线（合计11根K线）中低价最低的，则取消其底分型标记
-        - 对于标记为顶分型的K线，如果其高价不是前面5根K线以及后面5根K线（合计11根K线）中高价最高的，则取消其顶分型标记
+        - 对于标记为底分型的K线，如果其低价不是前面4根K线以及后面4根K线（合计9根K线）中低价最低的，则取消其底分型标记
+        - 对于标记为顶分型的K线，如果其高价不是前面4根K线以及后面4根K线（合计9根K线）中高价最高的，则取消其顶分型标记
         
         Args:
             df: 包含分型标记的DataFrame
-            window: 前后K线的数量，默认为5（总共检查11根K线）
+            window: 前后K线的数量，默认为4（总共检查9根K线）
             
         Returns:
             筛选后的DataFrame
@@ -1038,14 +1038,23 @@ class ChanlunProcessor:
         consecutive_filtered_bottom_count = len(consecutive_filtered_fractals[consecutive_filtered_fractals['fractal_type'] == 'bottom'])
         
         # 第四步：验证分型之间的关系（第六步）
-        relationship_filtered_df = self.validate_fractal_relationships(consecutive_filtered_df)
+        relationship_filtered_df1 = self.validate_fractal_relationships(consecutive_filtered_df)
+        # relationship_filtered_fractals1 = relationship_filtered_df1[relationship_filtered_df1['is_fractal']]
+        # relationship_filtered_top_count1 = len(relationship_filtered_fractals1[relationship_filtered_fractals1['fractal_type'] == 'top'])
+        # relationship_filtered_bottom_count1 = len(relationship_filtered_fractals1[relationship_filtered_fractals1['fractal_type'] == 'bottom'])
+        
+        # 第五步：筛选接近分型（第七步）
+        final_df0 = self.filter_close_fractals(relationship_filtered_df1)
+        
+        # 第六步：再次验证分型之间的关系（第八步）
+        relationship_filtered_df = self.validate_fractal_relationships(final_df0)
         relationship_filtered_fractals = relationship_filtered_df[relationship_filtered_df['is_fractal']]
         relationship_filtered_top_count = len(relationship_filtered_fractals[relationship_filtered_fractals['fractal_type'] == 'top'])
         relationship_filtered_bottom_count = len(relationship_filtered_fractals[relationship_filtered_fractals['fractal_type'] == 'bottom'])
-        
-        # 第五步：筛选接近分型（第六步新增）
+
+        # 第七步：筛选接近分型（第九步）
         final_df = self.filter_close_fractals(relationship_filtered_df)
-        
+
         # 保存最终统计
         final_fractals = final_df[final_df['is_fractal']]
         final_top_count = len(final_fractals[final_fractals['fractal_type'] == 'top'])
